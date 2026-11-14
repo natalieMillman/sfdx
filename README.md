@@ -58,7 +58,7 @@ Transform your ideas into custom Lightning apps that extend CRM workflows direct
 
 ## Exception Logging and Slack Alerts
 
-The `force-app/main/logging` folder is a self-contained logging framework. Every logged failure becomes a `Log__c` record (Logs tab), matching failures post to Slack within seconds, and one Slack message each morning tabulates the previous 24 hours.
+The `logging` package directory is a self-contained logging framework with no dependency on the rest of the project. It is listed before `force-app` in `sfdx-project.json` because the Add-On code calls it. Every logged failure becomes a `Log__c` record (Logs tab), matching failures post to Slack within seconds, and one Slack message each morning tabulates the previous 24 hours.
 
 Logs are published as `Log_Event__e` platform events with the Publish Immediately behavior, so a log is kept even when the transaction that wrote it rolls back.
 
@@ -96,7 +96,7 @@ Repeats of one failure in a burst send one alert with a count. A failure that al
 3. **Deploy** with that user's username in the environment. The deploy fails without it:
 
    ```bash
-   LOGGING_RUN_AS_USERNAME=integration.user@example.com sf project deploy start --source-dir force-app/main/logging --target-org <alias>
+   LOGGING_RUN_AS_USERNAME=integration.user@example.com sf project deploy start --source-dir logging --target-org <alias>
    ```
 
 4. **Permission sets.** Assign **Logging Runtime** to the running user. Give people who read logs **Log Viewer**.

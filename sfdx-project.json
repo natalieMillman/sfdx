@@ -1,6 +1,10 @@
 {
   "packageDirectories": [
     {
+      "path": "logging",
+      "default": false
+    },
+    {
       "path": "force-app",
       "default": true
     }
@@ -11,7 +15,7 @@
   "sourceApiVersion": "68.0",
   "replacements": [
     {
-      "filename": "force-app/main/logging/platformEventSubscriberConfigs/LogEventTriggerConfig.platformEventSubscriberConfig-meta.xml",
+      "filename": "logging/main/default/platformEventSubscriberConfigs/LogEventTriggerConfig.platformEventSubscriberConfig-meta.xml",
       "stringToReplace": "__LOGGING_RUN_AS_USERNAME__",
       "replaceWithEnv": "LOGGING_RUN_AS_USERNAME"
     }
