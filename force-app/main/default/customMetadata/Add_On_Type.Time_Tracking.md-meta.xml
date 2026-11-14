@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomMetadata
+  xmlns="http://soap.sforce.com/2006/04/metadata"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+>
+    <label>Time Tracking</label>
+    <protected>false</protected>
+    <values>
+        <field>Add_On_Type__c</field>
+        <value xsi:type="xsd:string">Time Tracking</value>
+    </values>
+    <values>
+        <field>Product_Code__c</field>
+        <value xsi:type="xsd:string">TIME-TRACK</value>
+    </values>
+    <values>
+        <field>Quantity_Fields__c</field>
+        <value xsi:type="xsd:string">Number_of_Hourly_Employees__c</value>
+    </values>
+</CustomMetadata>
