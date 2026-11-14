@@ -73,6 +73,7 @@ public with sharing class AddOnLineItemSyncService {
         productCodesOf(approved)
       );
     } catch (PricebookService.PricebookException e) {
+      Logger.error('AddOnLineItemSyncService.planApproved', e);
       for (Add_On__c addOn : approved) {
         addOn.addError(e.getMessage());
       }

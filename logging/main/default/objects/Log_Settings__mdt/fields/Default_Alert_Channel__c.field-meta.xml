@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Default_Alert_Channel__c</fullName>
+    <description
+  >Slack channel for alert rules that do not name one.</description>
+    <label>Default Alert Channel</label>
+    <length>80</length>
+    <type>Text</type>
+</CustomField>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Fingerprint__c</fullName>
+    <description
+  >Hash of source, exception type and normalised message. Groups repeats of the same failure.</description>
+    <label>Fingerprint</label>
+    <length>64</length>
+    <externalId>true</externalId>
+    <unique>false</unique>
+    <type>Text</type>
+</CustomField>
