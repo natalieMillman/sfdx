@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Slack_Channel__c</fullName>
+    <description>Blank uses the default alert channel.</description>
+    <label>Slack Channel</label>
+    <length>80</length>
+    <type>Text</type>
+</CustomField>

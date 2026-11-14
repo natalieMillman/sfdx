@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Source_Name__c</fullName>
+    <description
+  >Exact source name, or a prefix ending in *. Blank matches any.</description>
+    <label>Source Name</label>
+    <length>255</length>
+    <type>Text</type>
+</CustomField>

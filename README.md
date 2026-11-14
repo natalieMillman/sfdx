@@ -11,7 +11,7 @@ Before you start, make sure you have:
 - **Salesforce CLI** - Download from [developer.salesforce.com/tools/salesforcecli](https://developer.salesforce.com/tools/salesforcecli). See [Install Salesforce CLI](https://developer.salesforce.com/docs/atlas.en-us.sfdx_setup.meta/sfdx_setup/sfdx_setup_install_cli.htm) for details.
 - **VS Code with Salesforce Extension Pack** - See [Installation Instructions](https://developer.salesforce.com/docs/platform/sfvscode-extensions/guide/install.html) for details. Includes the Agentforce Vibes extension.
 - **A development org** - Sign up for a free Developer Edition org [here](https://developer.salesforce.com/signup).
-- **Dev Hub enabled** (optional, required to create scratch orgs) - You can enable Dev Hub in your development org under Setup > Dev Hub.  See [Provide Developers Access to Salesforce DX Tools](https://developer.salesforce.com/docs/atlas.en-us.sfdx_dev.meta/sfdx_dev/sfdx_setup_dx_tools.htm).
+- **Dev Hub enabled** (optional, required to create scratch orgs) - You can enable Dev Hub in your development org under Setup > Dev Hub. See [Provide Developers Access to Salesforce DX Tools](https://developer.salesforce.com/docs/atlas.en-us.sfdx_dev.meta/sfdx_dev/sfdx_setup_dx_tools.htm).
 
 ## Project Structure
 
@@ -56,3 +56,67 @@ Transform your ideas into custom Lightning apps that extend CRM workflows direct
 - [Salesforce CLI Plugin Development Guide](https://developer.salesforce.com/docs/platform/salesforce-cli-plugin/guide/conceptual-overview.html)
 - [Salesforce VS Code Extensions Documentation](https://developer.salesforce.com/tools/vscode/)
 
+## Exception Logging and Slack Alerts
+
+The `force-app/main/logging` folder is a self-contained logging framework. Every logged failure becomes a `Log__c` record (Logs tab), matching failures post to Slack within seconds, and one Slack message each morning tabulates the previous 24 hours.
+
+Logs are published as `Log_Event__e` platform events with the Publish Immediately behavior, so a log is kept even when the transaction that wrote it rolls back.
+
+### Logging from code
+
+| Situation                                                                                   | What to write                                                                                                                                                                                                                                                       |
+| ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Caught exception you deal with                                                              | `Logger.error('MyClass.myMethod', e);` The entry is buffered until `Logger.flush()`.                                                                                                                                                                                |
+| Apex entry point (trigger handler, `@AuraEnabled`, REST resource, `@future`, `Schedulable`) | Wrap the body: `try { ... } catch (Exception e) { Logger.unhandled('MyClass', e); throw e; } finally { Logger.flush(); }` See `AddOnTriggerHandler`.                                                                                                                |
+| Queueable                                                                                   | First line of `execute`: `System.attachFinalizer(new LoggingFinalizer('MyQueueable'));`                                                                                                                                                                             |
+| Batch Apex                                                                                  | Add `Database.RaisesPlatformEvents` to the class. Failures are logged by `BatchApexErrorEventTrigger`.                                                                                                                                                              |
+| Callout                                                                                     | `Logger.integrationError('BillingApi.createInvoice', request, response);` for a failure response, or pass the caught exception in place of the response. Only the method, endpoint path, status and a response excerpt are logged, never headers or request bodies. |
+| Flow                                                                                        | Connect each fault connector to the **Log Flow Error** action. Pass the flow API name and `{!$Flow.FaultMessage}`.                                                                                                                                                  |
+
+For async entry points pass the source type so the right alert rule matches, for example `Logger.unhandled(Logger.SOURCE_SCHEDULABLE, 'NightlyJob', e)`.
+
+`Logger` never throws and works for users with no access to the logging objects. Apex at API version 67.0 runs database operations in user mode by default, so the framework opts into system mode explicitly. Keep that when you change it.
+
+### Real-time alert rules
+
+`Log_Alert_Rule__mdt` records decide what alerts. Only `ERROR` entries alert. Shipped rules:
+
+- **Unhandled Apex**: any unhandled Apex exception.
+- **Async Jobs**: any Batch, Queueable, Schedulable or Future failure.
+- **Integrations**: any integration failure.
+
+To alert on a flow, add a record with Source Types `Flow` and Source Name set to the flow API name (a trailing `*` matches by prefix). A rule that names a source wins over a general rule. Leave Slack Channel blank to use the default alert channel from `Log_Settings.Default`.
+
+Repeats of one failure in a burst send one alert with a count. A failure that alerted within the rule's Throttle Minutes is not sent again, and at most Max Alerts Per Batch messages go out per batch of events.
+
+### One-time setup
+
+1. **Slack app.** Create a Slack app with the bot scopes `chat:write` and `chat:write.public`, install it to the workspace, and copy the bot token. Create the channels named in `Log_Settings.Default` (or edit that record).
+2. **Running user.** Choose the active user the logging pipeline runs as, ideally a dedicated integration user.
+3. **Deploy** with that user's username in the environment. The deploy fails without it:
+
+   ```bash
+   LOGGING_RUN_AS_USERNAME=integration.user@example.com sf project deploy start --source-dir force-app/main/logging --target-org <alias>
+   ```
+
+4. **Permission sets.** Assign **Logging Runtime** to the running user. Give people who read logs **Log Viewer**.
+5. **Token.** In Setup, open Named Credentials, then the External Credentials tab, then **Slack**. On the **Bot** principal add an authentication parameter named `BotToken` whose value is the bot token. The token is never stored in source.
+6. **Restart the trigger.** In Setup, open Platform Events, then **Log Event**. In the Subscriptions list click **Manage** next to `LogEventTrigger`, then suspend and resume it. Do this after the first deploy and whenever the running user changes. Until you do, the trigger keeps running as the Automated Process user, which cannot use the Slack credential, and every alert fails with "We couldn't access the credential(s)".
+7. **Schedule the jobs** as the running user (daily summary at 08:00, purge at 02:00 in that user's time zone):
+
+   ```bash
+   sf apex run --file scripts/apex/schedule-logging-jobs.apex --target-org <alias>
+   ```
+
+8. **Catch-all for failures nothing else caught.** In Setup, open Email Services, then **ExceptionEmailService**, and add an email address that runs as the running user. Add that address under Apex Exception Email. In Process Automation Settings set "Send Process or Flow Error Email to" to Apex Exception Email Recipients. Once real emails arrive, restrict the address's "Accept Email From" list to the senders you see, so nobody else can inject log entries.
+
+   This catch-all is best effort. The email wording is not a published contract and Salesforce does not send an email for every repeat of an error, so guards and fault paths remain the primary capture.
+
+9. **Check it.** Run `Logger.unhandled('SmokeTest', new IllegalArgumentException('test'));` as anonymous Apex. Within a minute an alert should appear in the alert channel and the new log's Alert Status should be `Sent`. If it is `Failed`, Alert Error says why.
+
+### Operating it
+
+- Post a summary now: `System.enqueueJob(new LogDailySummaryJob.Sender());`
+- Turn logging off: clear Is Enabled on `Log_Settings.Default`.
+- Retention: logs older than Retention Days are deleted nightly by `LogPurgeBatch`.
+- A failed Slack post is recorded on the log (Alert Status `Failed`, Alert Error). Failures of the logging pipeline itself are logged with source type `Logging`, which never alerts, so a broken alert cannot alert about itself.

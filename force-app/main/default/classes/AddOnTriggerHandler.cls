@@ -4,22 +4,31 @@ public with sharing class AddOnTriggerHandler {
     List<Add_On__c> newRecords,
     Map<Id, Add_On__c> oldRecords
   ) {
-    switch on operation {
-      when BEFORE_INSERT, BEFORE_UPDATE {
-        AddOnScopeService.apply(newRecords, oldRecords);
+    try {
+      switch on operation {
+        when BEFORE_INSERT, BEFORE_UPDATE {
+          AddOnScopeService.apply(newRecords, oldRecords);
+        }
+        when AFTER_INSERT {
+          AddOnLineItemSyncService.sync(approvedOnly(newRecords));
+        }
+        when AFTER_UPDATE {
+          AddOnLineItemSyncService.sync(needingSync(newRecords, oldRecords));
+        }
+        when BEFORE_DELETE {
+          AddOnLineItemSyncService.deleteLineItemsFor(newRecords);
+        }
+        when AFTER_UNDELETE {
+          AddOnLineItemSyncService.sync(newRecords);
+        }
       }
-      when AFTER_INSERT {
-        AddOnLineItemSyncService.sync(approvedOnly(newRecords));
-      }
-      when AFTER_UPDATE {
-        AddOnLineItemSyncService.sync(needingSync(newRecords, oldRecords));
-      }
-      when BEFORE_DELETE {
-        AddOnLineItemSyncService.deleteLineItemsFor(newRecords);
-      }
-      when AFTER_UNDELETE {
-        AddOnLineItemSyncService.sync(newRecords);
-      }
+    } catch (Exception e) {
+      // Log, then let the exception fail the save as it did before.
+      Logger.unhandled('AddOnTriggerHandler', e);
+      throw e;
+    } finally {
+      // Publishes handled errors that the services logged along the way.
+      Logger.flush();
     }
   }
 
